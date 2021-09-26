@@ -5,6 +5,7 @@
 #include "spi_master.h"
 #include "qmk_ap2_led.h"
 #include "protocol.h"
+#include "timer.h"
 
 static const SerialConfig ledUartInitConfig = {
     .speed = 115200,
@@ -25,6 +26,21 @@ static const SerialConfig bleUartConfig = {
 static uint8_t ledMcuWakeup[11] = {0x7b, 0x10, 0x43, 0x10, 0x03, 0x00, 0x00, 0x7d, 0x02, 0x01, 0x02};
 
 ble_capslock_t BLECapsLock = {._dummy = {0}, .caps_lock = false};
+
+#if AP2_LED_SLEEP_ENABLE
+uint32_t sleep_timer;
+int8_t ap2_is_asleep = 0;
+
+void ap2_sleep(void) {
+    ap2_is_asleep = 1;
+    annepro2LedDisable();
+}
+
+void ap2_wake(void) {
+    annepro2LedEnable();
+    ap2_is_asleep = 0;
+}
+#endif
 
 void OVERRIDE bootloader_jump(void) {
     // Send msg to shine to boot into IAP
@@ -106,6 +122,16 @@ void matrix_scan_kb() {
         protoConsume(&proto, byte);
     }
 
+    /* If leds are enabled and we're not asleep - but should... */
+#if AP2_LED_SLEEP_ENABLE
+    if (annepro2LedStatus.matrixEnabled &&
+        ap2_is_asleep == 0 &&
+        timer_elapsed32(sleep_timer) >= SLEEP_TIME_AMOUNT)
+    {
+        ap2_sleep();
+    }
+#endif
+
     matrix_scan_user();
 }
 
@@ -117,6 +143,13 @@ bool OVERRIDE process_record_kb(uint16_t keycode, keyrecord_t *record) {
         if (annepro2LedStatus.matrixEnabled && annepro2LedStatus.isReactive) {
             annepro2LedForwardKeypress(record->event.key.row, record->event.key.col);
         }
+#if AP2_LED_SLEEP_ENABLE
+        /* Reset sleep timer */
+        sleep_timer = timer_read32();
+        if (ap2_is_asleep) {
+            ap2_wake();
+        }
+#endif
 
         const annepro2Led_t blue = {
             .p.blue  = 0xff,
