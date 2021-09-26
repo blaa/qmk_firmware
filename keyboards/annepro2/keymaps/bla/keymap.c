@@ -51,13 +51,13 @@ enum anne_pro_layers {
   * |-----------------------------------------------------------------------------------------+
   * | Tab    |  q  | UP  |  e  |  7  |  8  |  9  |  u  |  i  |  o  | PS | HOME | END |   \    |
   * |-----------------------------------------------------------------------------------------+
-  * |         |LEFT |DOWN |RIGHT|  4  |  5  |  6  |  j  |  k  |  l  | PGUP|PGDN |    Enter    |
+  * | HOLD LY |LEFT |DOWN |RIGHT|  4  |  5  |  6  |  j  |  k  |  l  | PGUP|PGDN |    Enter    |
   * |-----------------------------------------------------------------------------------------+
-  * | LayerHold? |V-UP |V-DWN|MUTE |  1  |  2  |  3  |  m  |  ,  |INSRT| DEL |    Shift       |
+  * |            |V-UP |V-DWN|MUTE |  1  |  2  |  3  |  m  |  ,  |INSRT| DEL |    Shift       |
   * |-----------------------------------------------------------------------------------------+
   * | Ctrl  |  L1   |  Alt  |               0                 |  Alt  |  FN1  |  FN2  | Ctrl  |
   * \-----------------------------------------------------------------------------------------/
-  *
+  * MO(_FN2_LY) holds the up/down/left/right available on WSAD.
   */
  [_FN1_LY] = KEYMAP( /* Base */
     KC_GRV,      KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,       KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12, KC_MEDIA_PLAY_PAUSE,
@@ -83,7 +83,7 @@ enum anne_pro_layers {
   */
  [_FN2_LY] = KEYMAP( /* Base */
     KC_TRNS, KC_AP2_BT1, KC_AP2_BT2, KC_AP2_BT3, KC_AP2_BT4, KC_TRNS, KC_TRNS, KC_TRNS, KC_AP_LED_OFF, KC_AP_LED_ON, KC_AP_LED_NEXT_INTENSITY, KC_AP_LED_SPEED, KC_TRNS, KC_MEDIA_PLAY_PAUSE,
-    MO(_FN2_LY),    KC_TRNS, KC_UP,   KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_PSCR, KC_HOME, KC_END, KC_TRNS,
+    KC_TRNS,        KC_TRNS, KC_UP,   KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_PSCR, KC_HOME, KC_END, KC_TRNS,
     KC_TRNS,        KC_LEFT, KC_DOWN, KC_RGHT, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_PGUP, KC_PGDN, KC_TRNS,
     KC_TRNS,        KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_INS,  KC_DEL,           KC_TRNS,
     KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, MO(_FN1_LY), MO(_FN2_LY), KC_TRNS
@@ -112,19 +112,39 @@ void keyboard_post_init_user(void) {
 }
 
 layer_state_t layer_state_set_user(layer_state_t layer) {
+  /* This is an example of how to automatically highlight keys that are active in a selected layer */
+  const uint16_t *keymap = &keymaps[get_highest_layer(layer)][0][0];
+  annepro2Led_t color = {
+    .p.red = 0,
+    .p.green = 0,
+    .p.blue = 0,
+    .p.alpha = 0xff, /* Overwrite color */
+  };
   switch(get_highest_layer(layer)) {
     case _FN1_LY:
       // Set the leds to green
-      annepro2LedSetForegroundColor(0x00, 0xFF, 0x00);
+      color.p.green = 0xFF;
       break;
     case _FN2_LY:
       // Set the leds to blue
-      annepro2LedSetForegroundColor(0x00, 0x00, 0xFF);
+      color.p.blue = 0xFF;
       break;
     default:
       // Reset back to the current profile
       annepro2LedResetForegroundColor();
-      break;
+      return layer;
+  }
+  for (int row = 0; row < MATRIX_ROWS; row++) {
+    for (int col = 0; col < MATRIX_COLS; col++) {
+      if (keymap[MATRIX_COLS*row + col] != KC_TRNS) {
+        color.p.alpha = 0xFF; /* Overwrite */
+        ledMask[ROWCOL2IDX(row, col)] = color;
+      } else {
+        color.p.alpha = 0x00; /* Don't overwrite */
+        ledMask[ROWCOL2IDX(row, col)] = color;
+      }
+    }
+    annepro2LedMaskSetRow(row);
   }
   return layer;
 }
