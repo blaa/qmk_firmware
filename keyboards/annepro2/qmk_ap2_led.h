@@ -17,10 +17,10 @@ typedef union {
     uint32_t rgb;
 } annepro2Led_t;
 
-#define ROWCOL2IDX(row, col) (NUM_COLUMN * (row) + (col))
 #define NUM_COLUMN 14
 #define NUM_ROW 5
 #define KEY_COUNT 70
+#define ROWCOL2IDX(row, col) (NUM_COLUMN * (row) + (col))
 
 /* Local copy of ledMask, used to override colors on the board */
 extern annepro2Led_t ledMask[KEY_COUNT];
