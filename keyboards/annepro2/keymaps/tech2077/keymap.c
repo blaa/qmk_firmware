@@ -121,7 +121,8 @@ layer_state_t layer_state_set_user(layer_state_t layer)
     return layer;
 }
 
-void raw_hid_receive(uint8_t *data, uint8_t length) {
+void raw_hid_receive_user(uint8_t *data, uint8_t length) {
+  /* NOTE: Seems obsolete / broken */
   uprintf("raw_hid len: %u\n", length);
   if (length == 1)
     annepro2LedSetProfile(data[0]);

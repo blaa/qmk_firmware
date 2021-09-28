@@ -6,6 +6,7 @@
 #include "qmk_ap2_led.h"
 #include "protocol.h"
 #include "timer.h"
+#include "string.h"
 
 static const SerialConfig ledUartInitConfig = {
     .speed = 115200,
@@ -83,6 +84,47 @@ void OVERRIDE keyboard_pre_init_kb(void) {
     sdStart(&SD0, &ledUartRuntimeConfig);
 }
 
+#ifdef RAW_ENABLE
+/* raw_hid_receive can't send data over the serial as this might cause a race.
+ * It buffers it here, to be send by the main QMK loop. */
+struct {
+    /* Command data to be forwarded */
+    uint8_t cmd;
+    char length;
+    unsigned char body[64];
+    /* 1 - struct is full, waits for transmission; 0 - empty, put more data. */
+    char full;
+} shine_fwd;
+
+/* OpenRGB integration - to let the PC control the Shine directly */
+__attribute__((weak)) void raw_hid_receive_user(uint8_t *data, uint8_t length) {
+}
+
+void raw_hid_receive(uint8_t *data, uint8_t length) {
+    switch (data[0]) {
+        case AP2_RAW_FORWARD_SHINE:
+        {
+            if (shine_fwd.full) {
+                /* I've tested it with a console, and seems not to happen. Even
+                 * if, it will only drop single commands - instead of hanging
+                 * the board. */
+                return;
+            }
+            shine_fwd.cmd = data[1];
+            shine_fwd.length = length - 2;
+            memcpy(shine_fwd.body, data+2, shine_fwd.length);
+            shine_fwd.full = 1;
+            break;
+        }
+        default:
+            /* Not handled. This can also happen on too frequent transmissions.
+             * 5ms delay between transmissions seems to work fine. */
+            raw_hid_receive_user(data, length);
+            break;
+    }
+}
+#endif
+
 void OVERRIDE keyboard_post_init_kb(void) {
     // Start BLE UART
     sdStart(&SD1, &bleUartConfig);
@@ -121,6 +163,17 @@ void matrix_scan_kb() {
         uint8_t byte = sdGet(&SD0);
         protoConsume(&proto, byte);
     }
+
+#if RAW_ENABLE
+    if (shine_fwd.full) {
+        protoTx(shine_fwd.cmd, shine_fwd.body, shine_fwd.length, 1);
+        shine_fwd.full = 0;
+        if (AP2_LED_SLEEP_ENABLE) {
+            /* Reset sleep timer */
+            sleep_timer = timer_read32();
+        }
+    }
+#endif
 
     /* If leds are enabled and we're not asleep - but should... */
 #if AP2_LED_SLEEP_ENABLE
@@ -227,3 +280,4 @@ bool OVERRIDE process_record_kb(uint16_t keycode, keyrecord_t *record) {
     }
     return process_record_user(keycode, record);
 }
+

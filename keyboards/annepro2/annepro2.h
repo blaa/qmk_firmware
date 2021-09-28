@@ -44,3 +44,10 @@ enum AP2KeyCodes {
     KC_AP_LED_SPEED,
     AP2_SAFE_RANGE,
 };
+
+#ifdef RAW_ENABLE
+// Raw HID commands
+enum AP2RawHidCodes {
+    AP2_RAW_FORWARD_SHINE = 1,
+};
+#endif

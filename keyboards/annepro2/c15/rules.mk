@@ -35,6 +35,7 @@ KEY_LOCK_ENABLE = no
 BOOTMAGIC_ENABLE = no
 CONSOLE_ENABLE = no
 COMMAND_ENABLE = yes
+# Required for openrgb communications.
 RAW_ENABLE = yes
 MIDI_ENABLE = no
 VIRTSER_ENABLE = no
